@@ -10,7 +10,7 @@ from loguru import logger
 import pandas as pd
 import hashlib
 import csv
-from typing import Dict, Set, List, Tuple
+from typing import Set
 
 class PasswordSyncError(Exception):
     pass
@@ -67,21 +67,57 @@ class PasswordSync:
             raise PasswordSyncError("LastPass CLI (lpass) and/or Bitwarden CLI (bw) not found. Please install both tools.")
 
     def check_lastpass_login(self):
-        """Check if logged into LastPass"""
+        """Check if logged into LastPass and login if needed using environment variables"""
+        import os
+        
         try:
             result = subprocess.run(['lpass', 'status'], capture_output=True, text=True)
             if 'Not logged in' in result.stdout or 'Not logged in' in result.stderr:
-                raise PasswordSyncError("Not logged into LastPass. Please run 'lpass login <email>' first.")
+                username = os.environ.get('LASTPASS_USERNAME')
+                password = os.environ.get('LASTPASS_PASSWORD')
+                if not username or not password:
+                    raise PasswordSyncError("LASTPASS_USERNAME and LASTPASS_PASSWORD environment variables must be set")
+                
+                # Login with MFA
+                try:
+                    process = subprocess.run(['lpass', 'login', '--trust', username], 
+                                          input=password, 
+                                          text=True, 
+                                          capture_output=True)
+                    if process.returncode != 0:
+                        raise PasswordSyncError(f"LastPass login failed: {process.stderr}")
+                except subprocess.CalledProcessError as e:
+                    raise PasswordSyncError(f"LastPass login failed: {str(e)}")
+                
+                logger.info("Successfully logged into LastPass")
         except subprocess.CalledProcessError as e:
             raise PasswordSyncError(f"LastPass status check failed: {str(e)}")
 
     def check_bitwarden_login(self):
-        """Check if logged into Bitwarden"""
+        """Check if logged into Bitwarden and login if needed using environment variables"""
+        import os
+
         try:
             result = subprocess.run(['bw', 'status'], capture_output=True, text=True)
             status = json.loads(result.stdout)
+            
             if status.get('status') != 'unlocked':
-                raise PasswordSyncError("Bitwarden vault is locked. Please run 'bw unlock' first.")
+                username = os.environ.get('BITWARDEN_USERNAME')
+                password = os.environ.get('BITWARDEN_PASSWORD')
+                if not username or not password:
+                    raise PasswordSyncError("BITWARDEN_USERNAME and BITWARDEN_PASSWORD environment variables must be set")
+                
+                try:
+                    process = subprocess.run(['bw', 'login', username], 
+                                          input=password,
+                                          text=True,
+                                          capture_output=True)
+                    if process.returncode != 0:
+                        raise PasswordSyncError(f"Bitwarden login failed: {process.stderr}")
+                except subprocess.CalledProcessError as e:
+                    raise PasswordSyncError(f"Bitwarden login failed: {str(e)}")
+                
+                logger.info("Successfully logged into Bitwarden")
         except subprocess.CalledProcessError as e:
             raise PasswordSyncError(f"Bitwarden status check failed: {str(e)}")
         except json.JSONDecodeError:
