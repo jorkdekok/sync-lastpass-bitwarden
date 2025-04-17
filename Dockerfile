@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13.3-slim-bookworm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -7,14 +7,28 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     bash \
     jq \
+    bash-completion \
+    build-essential \
+    cmake \
+    libcurl4  \
+    libcurl4-openssl-dev  \
+    libssl-dev  \
+    libxml2 \
+    libxml2-dev  \
+    libssl3 \
+    pkg-config \
+    ca-certificates \
+    xclip \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install LastPass CLI
-RUN curl -sL https://github.com/lastpass/lastpass-cli/releases/download/v1.3.7/lastpass-cli-1.3.7.tar.gz | tar xz \
-    && cd lastpass-cli-1.3.7 \
+RUN curl -sL https://github.com/lastpass/lastpass-cli/releases/download/v1.6.1/lastpass-cli-1.6.1.tar.gz | tar xz \
+    && cd lastpass-cli-1.6.1 \
     && make install \
     && cd .. \
-    && rm -rf lastpass-cli-1.3.7
+    && rm -rf lastpass-cli-1.6.1
 
 # Install Bitwarden CLI
 RUN npm install -g @bitwarden/cli
