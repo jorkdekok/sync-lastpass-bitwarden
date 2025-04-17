@@ -2,4 +2,6 @@ python-dateutil>=2.8.2
 pyyaml>=6.0.1
 loguru>=0.7.0
 pandas>=2.0.0
-hashlib_blake2>=0.1.2
+# hashlib>=0.3.1
+pytest>=7.4.0
+python-dotenv
