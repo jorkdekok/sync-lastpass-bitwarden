@@ -66,17 +66,21 @@ class PasswordSync:
         except FileNotFoundError:
             raise PasswordSyncError("LastPass CLI (lpass) and/or Bitwarden CLI (bw) not found. Please install both tools.")
 
+    def read_secret(self, secret_name: str) -> str:
+        """Read a Docker secret from the secrets directory"""
+        try:
+            with open(f"/run/secrets/{secret_name}", 'r') as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            raise PasswordSyncError(f"Secret {secret_name} not found")
+
     def check_lastpass_login(self):
-        """Check if logged into LastPass and login if needed using environment variables"""
-        import os
-        
+        """Check if logged into LastPass and login if needed using Docker secrets"""
         try:
             result = subprocess.run(['lpass', 'status'], capture_output=True, text=True)
             if 'Not logged in' in result.stdout or 'Not logged in' in result.stderr:
-                username = os.environ.get('LASTPASS_USERNAME')
-                password = os.environ.get('LASTPASS_PASSWORD')
-                if not username or not password:
-                    raise PasswordSyncError("LASTPASS_USERNAME and LASTPASS_PASSWORD environment variables must be set")
+                username = self.read_secret('lastpass_username')
+                password = self.read_secret('lastpass_password')
                 
                 # Login with MFA
                 try:
@@ -90,25 +94,21 @@ class PasswordSync:
                     raise PasswordSyncError(f"LastPass login failed: {str(e)}")
                 
                 logger.info("Successfully logged into LastPass")
-        except subprocess.CalledProcessError as e:
-            raise PasswordSyncError(f"LastPass status check failed: {str(e)}")
+        except Exception as e:
+            raise PasswordSyncError(f"Failed to check LastPass login: {str(e)}")
 
     def check_bitwarden_login(self):
-        """Check if logged into Bitwarden and login if needed using environment variables"""
-        import os
-
+        """Check if logged into Bitwarden and login if needed using Docker secrets"""
         try:
             result = subprocess.run(['bw', 'status'], capture_output=True, text=True)
             status = json.loads(result.stdout)
             
             if status.get('status') != 'unlocked':
-                username = os.environ.get('BITWARDEN_USERNAME')
-                password = os.environ.get('BITWARDEN_PASSWORD')
-                if not username or not password:
-                    raise PasswordSyncError("BITWARDEN_USERNAME and BITWARDEN_PASSWORD environment variables must be set")
+                email = self.read_secret('bitwarden_email')
+                password = self.read_secret('bitwarden_password')
                 
                 try:
-                    process = subprocess.run(['bw', 'login', username], 
+                    process = subprocess.run(['bw', 'login', email], 
                                           input=password,
                                           text=True,
                                           capture_output=True)
@@ -119,9 +119,7 @@ class PasswordSync:
                 
                 logger.info("Successfully logged into Bitwarden")
         except subprocess.CalledProcessError as e:
-            raise PasswordSyncError(f"Bitwarden status check failed: {str(e)}")
-        except json.JSONDecodeError:
-            raise PasswordSyncError("Failed to parse Bitwarden status")
+            raise PasswordSyncError(f"LastPass login failed: {str(e)}")
 
     def get_lastpass_entries(self) -> Set[VaultEntry]:
         """Export and parse LastPass entries"""
@@ -232,20 +230,15 @@ class PasswordSync:
             
             logger.info(f"Found {len(entries_to_sync)} entries to sync")
             
-            # Check if import is enabled
-            import os
-            if os.environ.get('IMPORT_TO_BITWARDEN', '').lower() == 'true':
-                # Prepare and import differences
-                import_path = self.prepare_import_csv(entries_to_sync)
-                self.import_to_bitwarden(import_path)
-                
-                # Cleanup
-                if import_path.exists():
-                    import_path.unlink()
-                
-                logger.success(f"Password sync completed successfully! Synced {len(entries_to_sync)} entries.")
-            else:
-                logger.info("Import to Bitwarden skipped (IMPORT_TO_BITWARDEN not set to 'true')")
+            # Always import when using Docker (no environment variable check needed)
+            import_path = self.prepare_import_csv(entries_to_sync)
+            self.import_to_bitwarden(import_path)
+            
+            # Cleanup
+            if import_path.exists():
+                import_path.unlink()
+            
+            logger.success(f"Password sync completed successfully! Synced {len(entries_to_sync)} entries.")
         except PasswordSyncError as e:
             logger.error(f"Sync failed: {str(e)}")
             sys.exit(1)

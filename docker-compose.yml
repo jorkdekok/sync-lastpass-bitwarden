@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  sync-passwords:
+    build: .
+    volumes:
+      - ./logs:/app/logs
+    secrets:
+      - lastpass_username
+      - lastpass_password
+      - bitwarden_email
+      - bitwarden_password
+      - bitwarden_client_id
+      - bitwarden_client_secret
+
+secrets:
+  lastpass_username:
+    file: ./secrets/lastpass_username.txt
+  lastpass_password:
+    file: ./secrets/lastpass_password.txt
+  bitwarden_email:
+    file: ./secrets/bitwarden_email.txt
+  bitwarden_password:
+    file: ./secrets/bitwarden_password.txt
+  bitwarden_client_id:
+    file: ./secrets/bitwarden_client_id.txt
+  bitwarden_client_secret:
+    file: ./secrets/bitwarden_client_secret.txt

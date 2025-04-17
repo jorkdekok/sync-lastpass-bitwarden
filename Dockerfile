@@ -46,7 +46,7 @@ COPY sync_passwords.py .
 # Create volume for logs
 VOLUME ["/app/logs"]
 
-# Set environment variables
+# Set non-sensitive environment variables
 ENV PYTHONUNBUFFERED=1
 
 ENTRYPOINT ["python", "sync_passwords.py"]
