@@ -232,15 +232,20 @@ class PasswordSync:
             
             logger.info(f"Found {len(entries_to_sync)} entries to sync")
             
-            # Prepare and import differences
-            import_path = self.prepare_import_csv(entries_to_sync)
-            self.import_to_bitwarden(import_path)
-            
-            # Cleanup
-            if import_path.exists():
-                import_path.unlink()
-            
-            logger.success(f"Password sync completed successfully! Synced {len(entries_to_sync)} entries.")
+            # Check if import is enabled
+            import os
+            if os.environ.get('IMPORT_TO_BITWARDEN', '').lower() == 'true':
+                # Prepare and import differences
+                import_path = self.prepare_import_csv(entries_to_sync)
+                self.import_to_bitwarden(import_path)
+                
+                # Cleanup
+                if import_path.exists():
+                    import_path.unlink()
+                
+                logger.success(f"Password sync completed successfully! Synced {len(entries_to_sync)} entries.")
+            else:
+                logger.info("Import to Bitwarden skipped (IMPORT_TO_BITWARDEN not set to 'true')")
         except PasswordSyncError as e:
             logger.error(f"Sync failed: {str(e)}")
             sys.exit(1)
